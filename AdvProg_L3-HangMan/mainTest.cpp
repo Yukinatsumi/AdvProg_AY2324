@@ -1,433 +1,528 @@
 #include <iostream>
-#include <cppunit/TestRunner.h>
-#include <cppunit/TestResult.h>
-#include <cppunit/TestResultCollector.h>
-#include <cppunit/extensions/HelperMacros.h>
-#include <cppunit/BriefTestProgressListener.h>
-#include <cppunit/extensions/TestFactoryRegistry.h>
-
-#include "hangman.h"
+#include <fstream>
 #include <string>
+#include <ctime>
+#include <vector>
+using namespace std;
+string wordState = "";	//For the current word state
+string defaultWords[12] = {"Programming", "Language", "C Plus Plus", "Recursion", "UML", "Class Inheritance", 
+						"Asymptotic Notation", "Space Complexity", "Exchange Sort", "Quick Sort", "Templates", "Operator Overloading"};
+vector<char> lettersUsed;	//To keep track of letters used
+vector<string> wordsUsed;	//FOR HARD MODE ONLY!!
+int SIZE;
 
-using std::string;
-
-struct TestStruct
-{
-    std::string testName;
-    bool result;
-    bool expected;
-    std::string errorMsg;
-};
-
-bool verifyGenerateRandomNumber(const int min, const int max) {
-    int myAnswer = generateRandomNumber(min, max);
-    return (myAnswer >= min && myAnswer <= max);
+//Display the current stick figure state:
+void displayCurFigure(int max, int guessNum){
+	switch(max){
+		case 12:	//EASY
+			if(guessNum == 10 || guessNum == 9){
+				cout << "\t O "<< endl;
+				cout << "\t   "<< endl;
+				cout << "\t   "<< endl;
+				cout << "\t   "<< endl;
+			}
+			else if(guessNum == 8 || guessNum == 7){
+				cout << "\t O "<< endl;
+				cout << "\t | "<< endl;
+				cout << "\t | "<< endl;
+				cout << "\t   "<< endl;
+			}
+			else if(guessNum == 6 || guessNum == 5){
+				cout << "\t O "<< endl;
+				cout << "\t\\| "<< endl;
+				cout << "\t | "<< endl;
+				cout << "\t   "<< endl;
+			}
+			else if(guessNum == 4|| guessNum == 3){
+				cout << "\t O "<< endl;
+				cout << "\t\\|/"<< endl;
+				cout << "\t | "<< endl;
+				cout << "\t   "<< endl;
+			}
+			else if(guessNum == 2 || guessNum == 1){
+				cout << "\t O "<< endl;
+				cout << "\t\\|/"<< endl;
+				cout << "\t | "<< endl;
+				cout << "\t/  "<< endl;
+			}
+			else if(guessNum == 0){
+				cout << "\t O "<< endl;
+				cout << "\t\\|/"<< endl;
+				cout << "\t | "<< endl;
+				cout << "\t/ \\"<< endl;
+			}
+			else{
+				cout << "\t   "<< endl;
+				cout << "\t   "<< endl;
+				cout << "\t   "<< endl;
+				cout << "\t   "<< endl;
+			}
+			break;
+		case 6:		//NORMAL and HARD
+			if(guessNum == 5){
+				cout << "\t O "<< endl;
+				cout << "\t   "<< endl;
+				cout << "\t   "<< endl;
+				cout << "\t   "<< endl;
+			}
+			else if(guessNum == 4){
+				cout << "\t O "<< endl;
+				cout << "\t | "<< endl;
+				cout << "\t | "<< endl;
+				cout << "\t   "<< endl;
+			}
+			else if(guessNum == 3){
+				cout << "\t O "<< endl;
+				cout << "\t\\| "<< endl;
+				cout << "\t | "<< endl;
+				cout << "\t   "<< endl;
+			}
+			else if(guessNum == 2){
+				cout << "\t O "<< endl;
+				cout << "\t\\|/"<< endl;
+				cout << "\t | "<< endl;
+				cout << "\t   "<< endl;
+			}
+			else if(guessNum == 1){
+				cout << "\t O "<< endl;
+				cout << "\t\\|/"<< endl;
+				cout << "\t | "<< endl;
+				cout << "\t/  "<< endl;
+			}
+			else if(guessNum == 0){
+				cout << "\t O "<< endl;
+				cout << "\t\\|/"<< endl;
+				cout << "\t | "<< endl;
+				cout << "\t/ \\"<< endl;
+			}
+			else{
+				cout << "\t   "<< endl;
+				cout << "\t   "<< endl;
+				cout << "\t   "<< endl;
+				cout << "\t   "<< endl;
+			}
+			break;
+	}
 }
 
-bool verifyIsCharInWord(const char ch, const string& word){
-    return isCharInWord(ch, word);
+//Set words list:
+void setWordsList(vector<string> & list, string file){
+	string line;
+	ifstream readline;
+	readline.open(file);
+	while(true){
+		if(getline(readline, line)){
+			list.push_back(line);
+		}
+		else{
+			SIZE = list.size();
+			readline.close();
+			break;
+		}
+	}
+
+	int k;	//Used as an index
+	//Check for any characters that are not letters:
+	for(int i = 0; i < list.size(); i++){
+		k = list[i].find_first_of("1234567890-=`~!@#$%^&*)(}{][|\\:\";\'><.,?/_+");
+		while(k != string::npos){
+			list[i].erase(list[i].begin() + k);
+			k = list[i].find_first_of("1234567890-=`~!@#$%^&*)(}{][|\\:\";\'><.,?/_+");
+		}
+	}
+
 }
 
-bool verifyChooseWordFromList(const vector<string>& wordList, int index, string correctWord){
-    string myAnswer = chooseWordFromList(wordList, index);
-    return (myAnswer == correctWord);
+//Create the starting wordState
+void createWordState(string word){
+	for(int i = 0; i < word.length(); i++){
+		if(word[i] == ' '){
+			wordState.append(" ");
+		}
+		else{
+			wordState.append("_");
+		}
+	}
 }
 
-bool verifyUpdateSecretWord(string secretWord, const char ch, const string word, string answer) {
-    updateSecretWord(secretWord, ch, word);
-    return secretWord == answer;
+//Check if word is complete and correct
+bool finishedWord(string word){
+	return (wordState == word);
 }
 
-bool verifyUpdateEnteredChars(const char ch, string chars, string answer) {
-    updateEnteredChars(ch, chars);
-    return chars == answer;
+//Creating a temporary copy of the original word
+string createTemp(string origWord){
+	string temp = origWord;
+	
+	for(int i = 0; i < temp.length(); i++){
+		temp[i] = tolower(temp[i]);
+	}
+
+	return temp;
 }
 
-int verifyUpdateIncorrectGuess(int incorrectGuess) {
-    updateIncorrectGuess(incorrectGuess);
-    return incorrectGuess;
+//Display current state of 'wordState'
+void displayWordState(){
+	int wordCount = 0;
+	for(int i = 0; i < wordState.length(); i++){
+		if(wordState[i] == ' '){
+			++wordCount;
+			if(wordCount > 4){
+				cout << endl;
+				wordCount = 0;
+			}
+		}
+		cout << wordState[i] << " ";
+	}
+	cout << endl;
 }
 
-bool verifyProcessData(const char ch, const string& word, 
-                string& secretWord, 
-                string& correctChars, 
-                int& incorrectGuess, string& incorrectChars){
-    string preCorrectChars = correctChars;
-    string preSecretWord = secretWord;
-    int preIncorrectGuess = incorrectGuess;
-    string preIncorrectChars = incorrectChars;
-    processData(ch, word, secretWord, correctChars, incorrectGuess, incorrectChars);
-    if (word.find_first_of(ch) != string::npos){
-        return (correctChars.length() > preCorrectChars.length()) && (secretWord != preSecretWord);
-    }else{
-        return (preIncorrectGuess+1 == incorrectGuess) && (incorrectChars.length() > preIncorrectChars.length());
-    }
+//Check if letter exists in the original word
+bool letterExists(char letter, string tempWord){
+	return (tempWord.find_first_of(letter) != string::npos);
 }
 
-bool verifyGenerateHiddenCharacters(string secretWord, string answer) {
-    string myAnswer = generateHiddenCharacters(secretWord);
-    return myAnswer == answer;
+//IF THE LETTER EXISTS, add it to 'wordState'
+void changeWordState(char letter, string wordTemp, string word){
+	for(int i = 0; i < wordState.length(); i++){
+		if(wordTemp[i] == letter){
+			wordState[i] = word[i];
+		}
+	}
 }
 
-void runTestLoop(TestStruct testCases[], int testSize){
-    for (int i = 0; i< testSize; i++){
-        std::cout << testCases[i].testName + ": ";
-        if (testCases[i].result == testCases[i].expected)
-        {
-            std::cout << "PASSED!";
-        }
-        else
-        {
-            std::cout << "FAILED!\n";
-            std::cout << testCases[i].errorMsg;
-            exit(1);
-        }
-    }
+//Add the letters the user already input
+void addLettersUsed(char letter){
+	char capLetter = toupper(letter);
+	if(lettersUsed.size() == 0){
+		lettersUsed.push_back(capLetter);
+	}
+	else{
+		bool letterExists = false;
+		for(int i = 0; i < lettersUsed.size(); i++){
+			if(lettersUsed[i] == capLetter){
+				letterExists = true;
+				break;
+			}
+		}
+	
+		if(!letterExists){
+			lettersUsed.push_back(capLetter);
+		}
+	}
+
 }
 
-class Test : public CPPUNIT_NS::TestCase
-{
-    CPPUNIT_TEST_SUITE(Test);
-    CPPUNIT_TEST(testGenerateRandomNumber);
-    CPPUNIT_TEST(testIsCharInWord);
-    CPPUNIT_TEST(testChooseWordFromList);
-    CPPUNIT_TEST(testProcessData);
-    CPPUNIT_TEST(testUpdateSecretWord);
-    CPPUNIT_TEST(testUpdateEnteredChars);
-    CPPUNIT_TEST(testUpdateIncorrectGuess);
-    CPPUNIT_TEST(testGenerateHiddenCharacters);
-    CPPUNIT_TEST(successTestExit);
-    CPPUNIT_TEST_SUITE_END();
-
-    public:
-      void setUp(void) {}
-      void tearDown(void) {}
-
-    protected:
-      void testGenerateRandomNumber(void) {
-        const int testSize = 5;
-        std::string sharedName = "\n[checkGenerateRandomNumber test] ";
-        TestStruct checkGenerateRandomNumber[testSize]  = 
-        {
-            {
-                sharedName + "test normal 1", 
-                verifyGenerateRandomNumber(0, 10), 
-                true,
-                "Should return an integer number between 0 and 10\n"
-            },
-            {
-                sharedName + "test normal 2", 
-                verifyGenerateRandomNumber(15, 50), 
-                true,
-                "Should return an integer number between 15 and 50\n"
-            },
-            {
-                sharedName + "test normal 3", 
-                verifyGenerateRandomNumber(1, 100), 
-                true,
-                "Should return an integer number between 1 and 100\n"
-            },
-            {
-                sharedName + "test normal 4", 
-                verifyGenerateRandomNumber(1003, 2022), 
-                true,
-                "Should return an integer number between 1003 and 2022\n"
-            },
-            {
-                sharedName + "test normal 5", 
-                verifyGenerateRandomNumber(10, 10), 
-                true,
-                "Should return an integer number between 10 and 10\n"
-            },
-        };
-        runTestLoop(checkGenerateRandomNumber, testSize);
-      }
-
-      void testIsCharInWord(void) {
-        const int testSize = 5;
-        std::string sharedName = "\n[checkIsCharInWord test] ";
-        TestStruct checkIsCharInWord[testSize]  = 
-        {
-            {
-                sharedName + "test normal 1", 
-                verifyIsCharInWord('a', "dad"), 
-                true,
-                "Character 'a' exists in word dad. Should return true\n"
-            },
-            {
-                sharedName + "test normal 2", 
-                verifyIsCharInWord('a', "mom"), 
-                false,
-                "Character 'a' doesn't exist in word mom. Should return false\n"
-            },
-            {
-                sharedName + "test normal 3", 
-                verifyIsCharInWord('g', "strange"), 
-                true,
-                "Character 'g' exists in word strange. Should return true\n"
-            },
-            {
-                sharedName + "test normal 4", 
-                verifyIsCharInWord('m', "mommy"), 
-                true,
-                "Character 'm' exists in word mommy. Should return true\n"
-            },
-            {
-                sharedName + "test normal 5", 
-                verifyIsCharInWord('b', "animal"), 
-                false,
-                "Character 'b' doesn't exist in word animal. Should return false\n"
-            },
-        };
-        runTestLoop(checkIsCharInWord, testSize);
-      }
-
-      void testChooseWordFromList(void) {
-        const int testSize = 5;
-        vector<string> wordList;
-        wordList.push_back("MoM");
-        wordList.push_back("Dad");
-        wordList.push_back("faTher");
-        wordList.push_back("Mother");
-        wordList.push_back("FAMILY");
-        std::string sharedName = "\n[checkChooseWordFromList test] ";
-        TestStruct checkChooseWordFromList[testSize]  = 
-        {
-            {
-                sharedName + "test normal 1", 
-                verifyChooseWordFromList(wordList, 1, "dad"), 
-                true,
-                "Word 'dad' is in index 1 in the list. Should return dad\n"
-            },
-            {
-                sharedName + "test normal 2", 
-                verifyChooseWordFromList(wordList, 0, "mom"), 
-                true,
-                "Word 'mom' is in index 0 in the list. Should return mom\n"
-            },
-            {
-                sharedName + "test normal 3", 
-                verifyChooseWordFromList(wordList, 4, "family"), 
-                true,
-                "Word 'family' is in index 4 in the list. Should return family\n"
-            },
-            {
-                sharedName + "test normal 4", 
-                verifyChooseWordFromList(wordList, 3, "mother"), 
-                true,
-                "Word 'mother' is in index 3 in the list. Should return mother\n"
-            },
-            {
-                sharedName + "test normal 5", 
-                verifyChooseWordFromList(wordList, 2, "father"), 
-                true,
-                "Word 'father' is in index 2 in the list. Should return father\n"
-            },
-        };
-        runTestLoop(checkChooseWordFromList, testSize);
-      }
-
-      void testUpdateSecretWord(void) {
-        const int testSize = 5;
-        std::string sharedName = "\n[checkUpdateSecretWord test] ";
-        TestStruct checkUpdateSecretWord[testSize]  = 
-        {
-            {
-                sharedName + "test normal 1", 
-                verifyUpdateSecretWord("-", 'a', "a", "a"), 
-                true,
-                "Character 'a' exist in secret word. Should return string 'a'."
-            },
-            {
-                sharedName + "test normal 2", 
-                verifyUpdateSecretWord("--t", 'c', "cat", "c-t"), 
-                true,
-                "Character 'c' exist in secret word. Should return string 'c-t'."
-            },
-            {
-                sharedName + "test normal 3", 
-                verifyUpdateSecretWord("ca---ag-", 'r', "carriage", "carr-ag-"), 
-                true,
-                "Character 'r' exist in secret word. Should return string 'carr-ag-'."
-            },
-            {
-                sharedName + "test normal 4", 
-                verifyUpdateSecretWord("s-iss--s", 's', "scissors", "s-iss--s"), 
-                true,
-                "Character 's' existed in secret word. Should return string 's-iss--s'."
-            },
-            {
-                sharedName + "test normal 5", 
-                verifyUpdateSecretWord("circumsta-ce", 'n', "circumstance", "circumstance"), 
-                true,
-                "Character 'n' exist in secret word. Should return string 'circumstance'."
-            },
-        };
-        runTestLoop(checkUpdateSecretWord, testSize);
-      }
-
-    void testUpdateEnteredChars(void) {
-        const int testSize = 5;
-        std::string sharedName = "\n[checkUpdateEnteredChars test] ";
-        TestStruct checkUpdateEnteredChars[testSize]  = 
-        {
-          {
-              sharedName + "test normal 1", 
-              verifyUpdateEnteredChars('a', "s ", "s a "), 
-            true,
-            "Character 'a' is correct character. Should return string 's a '."
-        },
-        {
-            sharedName + "test normal 2", 
-            verifyUpdateEnteredChars('a', "a ", "a a "), 
-            true,
-            "Character 'a' is correct character. Should return string 'a a '."
-        },
-        {
-            sharedName + "test normal 3", 
-            verifyUpdateEnteredChars('r', "c a i a g e ", "c a i a g e r "), 
-            true,
-            "Character 'r' is correct character. Should return string 'c a i a g e r '."
-        },
-        {
-            sharedName + "test normal 4", 
-            verifyUpdateEnteredChars('o', "s c i ", "s c i o "), 
-            true,
-            "Character 'o' is correct character. Should return string 's c i o '."
-        },
-        {
-            sharedName + "test normal 5", 
-            verifyUpdateEnteredChars('n', "", "n "), 
-            true,
-            "Character 'n' is correct character. Should return string 'n '."
-        },
-      };
-      runTestLoop(checkUpdateEnteredChars, testSize);
-    }
-
-    void testUpdateIncorrectGuess(void) {
-        const int testSize = 5;
-        std::string sharedName = "[checkUpdateIncorrectGuess test] ";
-        std::cout << "\n>> Testing the UpdateIncorrectGuess() function"<< std::endl;
-        for(int incorrectGuess = 0; incorrectGuess < 5; incorrectGuess++){
-            // TestStruct res;
-            int youGot = verifyUpdateIncorrectGuess(incorrectGuess);
-            int expected = incorrectGuess+1;
-            if (youGot == expected){
-                std::cout << sharedName << " test normal 1: "<< "PASSED!"<< std::endl; 
-            }else{
-                std::cout << sharedName << " test normal 1: "<< "FAILED!"<< std::endl;
-                std::cout << "The current mistake is "<< incorrectGuess<< "! Got: " << youGot << ", Expected: "<< expected << " !"; 
-                exit(1);
-            }
-        }
-    }
-
-    void testProcessData(void) {
-        const int testSize = 5;
-        std::string sharedName = "\n[checkProcessData test] ";
-        const string word = "strange";
-        string secretWord = "-------";
-        string correctChars = "";
-        string incorrectChars = "";
-        int incorrectGuess = 0;
-        TestStruct checkProcessData[testSize]  = 
-        {
-            {
-                sharedName + "test normal 1", 
-                verifyProcessData('a', word, secretWord, correctChars, incorrectGuess, incorrectChars), 
-                true,
-                "Character 'a' exists in word strange. secretWord and correctChars should be updated\n"
-            },
-            {
-                sharedName + "test normal 2", 
-                verifyProcessData('b', word, secretWord, correctChars, incorrectGuess, incorrectChars), 
-                true,
-                "Character 'b' doesn't exist in word strange. incorrectGuess and incorrectChars should be updated\n"
-            },
-            {
-                sharedName + "test normal 3", 
-                verifyProcessData('k', word, secretWord, correctChars, incorrectGuess, incorrectChars), 
-                true,
-                "Character 'k' doesn't exists in word strange. incorrectGuess and incorrectChars should be updated\n"
-            },
-            {
-                sharedName + "test normal 4", 
-                verifyProcessData('e', word, secretWord, correctChars, incorrectGuess, incorrectChars), 
-                true,
-                "Character 'e' exists in word strange. secretWord and correctChars should be updated\n"
-            },
-            {
-                sharedName + "test normal 5", 
-                verifyProcessData('t', word, secretWord, correctChars, incorrectGuess, incorrectChars), 
-                true,
-                "Character 't' exists in word strange. secretWord and correctChars should be updated\n"
-            },
-        };
-        runTestLoop(checkProcessData, testSize);
-    }
-
-    void testGenerateHiddenCharacters(void) {
-        const int testSize = 5;
-        std::string sharedName = "\n[checkGenerateHiddenCharacters test] ";
-        TestStruct checkGenerateHiddenCharacters[testSize]  = 
-        {
-            {
-                sharedName + "test normal 1", 
-                verifyGenerateHiddenCharacters("a", "-"), 
-                true,
-                "Secret Word is 'a'. Should return string '-'."
-            },
-            {
-                sharedName + "test normal 2", 
-                verifyGenerateHiddenCharacters("cat", "---"), 
-                true,
-                "Secret Word is 'cat'. Should return string '---'."
-            },
-            {
-                sharedName + "test normal 3", 
-                verifyGenerateHiddenCharacters("carriage", "--------"), 
-                true,
-                "Secret Word is 'carriage'. Should return string '--------'."
-            },
-            {
-                sharedName + "test normal 4", 
-                verifyGenerateHiddenCharacters("scissors", "--------"), 
-                true,
-                "Secret Word is 'scissors'. Should return string '--------'."
-            },
-            {
-                sharedName + "test normal 5", 
-                verifyGenerateHiddenCharacters("circumstance", "------------"), 
-                true,
-                "Secret Word is 'circumstance'. Should return string '------------'."
-            },
-        };
-        runTestLoop(checkGenerateHiddenCharacters, testSize);
-    }   
-
-    void successTestExit(void) {
-        std::cout << "all tests passed! \n";
-        exit(0);
-    }   
-};  
 
 
-CPPUNIT_TEST_SUITE_REGISTRATION(Test);
+//Display the letters the user already input
+void displayLettersUsed(){
+	if(lettersUsed.size() == 0){
+		cout << endl;
+	}
+	else{
+		for(int i = 0; i < lettersUsed.size(); i++){
+			if(i % 5 == 0 && i != 0){
+				cout << "\n" << endl;
+			}
+			cout << "\t" << lettersUsed[i];
+		}
+		cout << "\n" << endl;
+	}
+}
 
-int main()
-{
-  CPPUNIT_NS::TestResult controller;
+//HARD MODE ONLY:
+//Check if any of the letters previously entered are in the new word
+void checkLettersUsed_HARD(string tempWord, string origWord){
+	char tempLetter;
+	for(int i = 0; i < lettersUsed.size(); i++){
+		tempLetter = tolower(lettersUsed[i]);
+		if(letterExists(tempLetter, tempWord)){
+			changeWordState(tempLetter, tempWord, origWord);
+		}
+	}
+}
 
-  CPPUNIT_NS::TestResultCollector result;
-  controller.addListener(&result);
+void addWordsUsed(string word){
+	wordsUsed.push_back(word);
+}
 
-  CPPUNIT_NS::BriefTestProgressListener progress;
-  controller.addListener(&progress);
+void displayWordsUsed(){
+	int j;
+	for(int i = 0; i < wordsUsed.size(); i++){
+		j = i + 1;
+		cout << j << ". " << wordsUsed[i] << endl;
+	}
+	cout << endl;
+}
 
-  CPPUNIT_NS::TestRunner runner;
-  runner.addTest(CPPUNIT_NS::TestFactoryRegistry::getRegistry().makeTest());
-  runner.run(controller);
+/**********EASY/NORMAL MODE**********/
+void startGame_EASY_NORMAL(string word, int MAX_GUESSES){
+	int curGuessNum = MAX_GUESSES;
+	string inputGuess;
+	char letterGuess;
+	string tempWord = createTemp(word);
+	char tempLetter;
+	int won = 1;	//1 means WIN; 0 means LOSE; 3 means quitting
+	createWordState(word);
 
-  return result.wasSuccessful() ? 0 : 1;
+	while(true){
+		if(curGuessNum == 0){
+			displayCurFigure(MAX_GUESSES, curGuessNum);
+			won = 0;
+			break;
+		}
+		else if(finishedWord(word)){
+			break;
+		}
+
+		displayCurFigure(MAX_GUESSES, curGuessNum);
+		displayWordState();
+		cout << "\nNumber of guesses left: " << curGuessNum << endl;
+		cout << "Letters that you have guessed:\n";
+		displayLettersUsed();
+		cout << "Enter a letter (0 to exit): ";
+		cin >> inputGuess;
+		letterGuess = inputGuess[0];
+		system("cls");
+		
+		//USER QUITS:
+		if(letterGuess == '0'){
+			won = 3;
+			break;
+		}
+		////////////
+
+		tempLetter = tolower(letterGuess);
+		addLettersUsed(tempLetter);
+
+		if(!letterExists(tempLetter, tempWord)){
+			--curGuessNum;
+		}
+		else{
+			changeWordState(tempLetter, tempWord, word);
+		}
+	}
+	
+	lettersUsed.clear();
+	wordState = "";
+
+	if(won == 1){
+		cout << "YOU WON! CONGRATULATIONS!" << endl;
+		cout << "Your word: " << word << endl;
+	}
+	else if(won == 0){
+		cout << "You lose!!!" << endl;
+		cout << "The word was \"" << word << "\"" << endl;
+	}
+	else{
+		cout << "Exiting!!" << endl;
+	}
+	
+}
+/********************************************/
+
+/**********HARD MODE**********/
+void startGame_HARD(vector<string> list, int MAX_GUESSES){
+	string word = list[rand() % list.size()];
+	int curGuessNum = MAX_GUESSES;
+	string inputGuess;
+	char letterGuess;
+	string tempWord;
+	char tempLetter;
+	int won = 1;	//1 means WIN; 0 means LOSE; 3 means quitting
+	createWordState(word);
+
+	while(true){
+		if(curGuessNum == 0){
+			displayCurFigure(MAX_GUESSES, curGuessNum);
+			won = 0;
+			break;
+		}
+		else if(finishedWord(word)){
+			break;
+		}
+
+		displayCurFigure(MAX_GUESSES, curGuessNum);
+		displayWordState();
+		cout << "\nNumber of guesses left: " << curGuessNum << endl;
+		cout << "Letters that you have guessed:\n";
+		displayLettersUsed();
+		cout << "Enter a letter (0 to exit): ";
+		cin >> inputGuess;
+		letterGuess = inputGuess[0];
+		system("cls");
+
+		//USER QUITS:
+		if(letterGuess == '0'){
+			won = 3;
+			break;
+		}
+		////////////
+
+		tempLetter = tolower(letterGuess);
+		addLettersUsed(tempLetter);
+		tempWord = createTemp(word);
+
+		if(!letterExists(tempLetter, tempWord)){
+			--curGuessNum;
+			wordState = "";
+			word = list[rand() % list.size()];
+			addWordsUsed(word);
+			createWordState(word);
+			tempWord = createTemp(word);
+			checkLettersUsed_HARD(tempWord, word);
+		}
+		else{
+			changeWordState(tempLetter, tempWord, word);
+		}
+	}
+	
+	lettersUsed.clear();
+	wordState = "";
+
+	if(won == 1){
+		cout << "YOU WON! CONGRATULATIONS!" << endl;
+		cout << "Winning word: " << word << "\n" << endl;
+		cout << "Words used: " << endl;
+		displayWordsUsed();
+		wordsUsed.clear();
+	}
+	else if(won == 0){
+		cout << "You lose!!!" << endl;
+		cout << "Words used: " << endl;
+		displayWordsUsed();
+		wordsUsed.clear();
+	}
+	else{
+		cout << "Exiting!!" << endl;
+	}
+
+}
+/********************************************/
+
+/*********MAIN*********/
+int main(){
+	string word;
+	string fileName;
+	vector<string> wordsList;
+	srand(time(0));
+	string playGame;
+	string difficulty;
+	ifstream fin;
+
+	while(true){
+		cout << "Welcome to JSP's Hangman Game!" << endl;
+		cout << "MAIN MENU" << endl;
+		cout << "1) Start Game" << endl;
+		cout << "2) Load File" << endl;
+		cout << "3) Exit" << endl;
+		cout << ">> ";
+		fileName = "";
+		cin >> playGame;
+		
+
+		if(playGame == "1" || playGame == "2"){
+			if(playGame == "1"){	//IF user selected Start Game
+				system("cls");
+				wordsList.assign(defaultWords, defaultWords + 12);
+				word = wordsList[rand() % 12];
+			}
+			else if(playGame == "2"){
+				cin.ignore();
+				system("cls");
+				cout << "**IMPORTANT**\nFile(s) must contain words that are separated by a new line. If a word contains characters that are NOT letters, those characters will be deleted.\n" << endl;
+				cout << "Please enter a file name to import your own words list: ";
+				getline(cin, fileName);
+
+
+				fin.open(fileName);
+				if(fin.fail()){
+					system("cls");
+					cout << "\"" + fileName + "\" doesn't exist!\n" << endl;
+					fin.close();
+					continue;
+				}
+				else{
+					setWordsList(wordsList, fileName);
+					fin.close();
+					if(SIZE == 0){
+						system("cls");
+						cout << "File is empty!\n" << endl;
+						continue;
+					}
+					else{
+						system("cls");
+						word = wordsList[rand() % SIZE];
+						cout << "Successfully read the file contents!\n" << endl;
+					}
+				}
+			}
+			
+			
+			while(true){
+				cout << "CHOOSE A DIFFICULTY: " << endl;
+				cout << "1) EASY" <<endl;
+				cout << "2) NORMAL" << endl;
+				cout << "3) HARD" << endl;
+				cout << "4) Difficulty description" << endl;
+				cout << "0 to return to main menu" << endl;
+				cout << ">> ";
+				cin >> difficulty;
+
+				if(difficulty == "0"){
+					system("cls");
+					break;
+				}
+				else if(difficulty == "1"){	//EASY
+					system("cls");
+					cout << "Starting Easy Mode!" << endl;
+					startGame_EASY_NORMAL(word, 12);
+					wordState.clear();
+					wordsList.clear();
+					cout << endl;
+					break;
+				}
+				else if(difficulty == "2"){	//NORMAL
+					system("cls");
+					cout << "Starting Normal Mode!" << endl;
+					startGame_EASY_NORMAL(word, 6);
+					wordState.clear();
+					wordsList.clear();
+					cout << endl;
+					break;
+				}
+				else if(difficulty == "3"){	//HARD
+					system("cls");
+					cout << "Starting Hard Mode!" << endl;
+					startGame_HARD(wordsList, 6);
+					wordState.clear();
+					wordsList.clear();
+					cout << endl;
+					break;
+				}
+				else if(difficulty == "4"){
+					system("cls");
+					cout << "EASY\t - 12 chances to guess the correct letters" << endl;
+					cout << "NORMAL\t - 6 chances to guess the correct letters" << endl;
+					cout << "HARD\t - 6 chance to guess the correct letters and \n\t every wrong guess will change the word!\n" << endl;
+				}
+				else{
+					system("cls");
+					cout << "Invalid option!\n" << endl;
+				}
+			}
+		}
+		else if(playGame == "3"){
+			cout << "Thanks for playing!" << endl;
+			break;
+		}
+		else{
+			system("cls");
+			cout << "Invalid option!\n" << endl;
+			cin.ignore();
+		}
+	}
+
+	return 0;
 }

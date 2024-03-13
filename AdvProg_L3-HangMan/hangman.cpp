@@ -1,150 +1,528 @@
 #include <iostream>
-#include "hangman.h"
+#include <fstream>
+#include <string>
+#include <ctime>
+#include <vector>
+using namespace std;
+string wordState = "";	//For the current word state
+string defaultWords[12] = {"Programming", "Language", "C Plus Plus", "Recursion", "UML", "Class Inheritance", 
+						"Asymptotic Notation", "Space Complexity", "Exchange Sort", "Quick Sort", "Templates", "Operator Overloading"};
+vector<char> lettersUsed;	//To keep track of letters used
+vector<string> wordsUsed;	//FOR HARD MODE ONLY!!
+int SIZE;
 
-using std::string;
-using std::vector;
-using std::ifstream;
-using std::domain_error;
-using std::cin;
-
-/***
-    Args:
-        min (int): left margin of a range
-        max (int): right margin of a range
-    Returns:
-        number (int) : random number in range [min; max]
-***/
-int generateRandomNumber(const int min, const int max)
-{
-    // TODO: Return a random integer number between min and max
-    return 1;
+//Display the current stick figure state:
+void displayCurFigure(int max, int guessNum){
+	switch(max){
+		case 12:	//EASY
+			if(guessNum == 10 || guessNum == 9){
+				cout << "\t O "<< endl;
+				cout << "\t   "<< endl;
+				cout << "\t   "<< endl;
+				cout << "\t   "<< endl;
+			}
+			else if(guessNum == 8 || guessNum == 7){
+				cout << "\t O "<< endl;
+				cout << "\t | "<< endl;
+				cout << "\t | "<< endl;
+				cout << "\t   "<< endl;
+			}
+			else if(guessNum == 6 || guessNum == 5){
+				cout << "\t O "<< endl;
+				cout << "\t\\| "<< endl;
+				cout << "\t | "<< endl;
+				cout << "\t   "<< endl;
+			}
+			else if(guessNum == 4|| guessNum == 3){
+				cout << "\t O "<< endl;
+				cout << "\t\\|/"<< endl;
+				cout << "\t | "<< endl;
+				cout << "\t   "<< endl;
+			}
+			else if(guessNum == 2 || guessNum == 1){
+				cout << "\t O "<< endl;
+				cout << "\t\\|/"<< endl;
+				cout << "\t | "<< endl;
+				cout << "\t/  "<< endl;
+			}
+			else if(guessNum == 0){
+				cout << "\t O "<< endl;
+				cout << "\t\\|/"<< endl;
+				cout << "\t | "<< endl;
+				cout << "\t/ \\"<< endl;
+			}
+			else{
+				cout << "\t   "<< endl;
+				cout << "\t   "<< endl;
+				cout << "\t   "<< endl;
+				cout << "\t   "<< endl;
+			}
+			break;
+		case 6:		//NORMAL and HARD
+			if(guessNum == 5){
+				cout << "\t O "<< endl;
+				cout << "\t   "<< endl;
+				cout << "\t   "<< endl;
+				cout << "\t   "<< endl;
+			}
+			else if(guessNum == 4){
+				cout << "\t O "<< endl;
+				cout << "\t | "<< endl;
+				cout << "\t | "<< endl;
+				cout << "\t   "<< endl;
+			}
+			else if(guessNum == 3){
+				cout << "\t O "<< endl;
+				cout << "\t\\| "<< endl;
+				cout << "\t | "<< endl;
+				cout << "\t   "<< endl;
+			}
+			else if(guessNum == 2){
+				cout << "\t O "<< endl;
+				cout << "\t\\|/"<< endl;
+				cout << "\t | "<< endl;
+				cout << "\t   "<< endl;
+			}
+			else if(guessNum == 1){
+				cout << "\t O "<< endl;
+				cout << "\t\\|/"<< endl;
+				cout << "\t | "<< endl;
+				cout << "\t/  "<< endl;
+			}
+			else if(guessNum == 0){
+				cout << "\t O "<< endl;
+				cout << "\t\\|/"<< endl;
+				cout << "\t | "<< endl;
+				cout << "\t/ \\"<< endl;
+			}
+			else{
+				cout << "\t   "<< endl;
+				cout << "\t   "<< endl;
+				cout << "\t   "<< endl;
+				cout << "\t   "<< endl;
+			}
+			break;
+	}
 }
 
-vector<string> readWordListFromFile(const string& filePath)
-{
-    vector<string> wordList;
-    string word;
-    ifstream wordFile (filePath);
-    if (!wordFile.is_open()) {
-        throw domain_error("Unable to open file");
-    }
+//Set words list:
+void setWordsList(vector<string> & list, string file){
+	string line;
+	ifstream readline;
+	readline.open(file);
+	while(true){
+		if(getline(readline, line)){
+			list.push_back(line);
+		}
+		else{
+			SIZE = list.size();
+			readline.close();
+			break;
+		}
+	}
 
-    //while ( getline (wordFile, word) ){  // Thong thuong doc tung line. 
-                                           // Chuong trinh nay cung chay.
-    while (wordFile >> word) {  // Nhung voi chuong trinh nay, doc tung word cung duoc
-                                // Tuc ca 2 cach doc deu chay.
-        wordList.push_back(word);
-        //cout << word << '\n';
-    }
-    wordFile.close();
+	int k;	//Used as an index
+	//Check for any characters that are not letters:
+	for(int i = 0; i < list.size(); i++){
+		k = list[i].find_first_of("1234567890-=`~!@#$%^&*)(}{][|\\:\";\'><.,?/_+");
+		while(k != string::npos){
+			list[i].erase(list[i].begin() + k);
+			k = list[i].find_first_of("1234567890-=`~!@#$%^&*)(}{][|\\:\";\'><.,?/_+");
+		}
+	}
 
-    return wordList;
 }
 
-/***
-    Args:
-        ch (char): A character
-        word (string): a word
-    Returns:
-        result (bool) : the character ch is in the word or not.
-***/
-bool isCharInWord(const char ch, const string& word)
-{
-    // TODO: return true if ch is in word else return false
-    return true;
+//Create the starting wordState
+void createWordState(string word){
+	for(int i = 0; i < word.length(); i++){
+		if(word[i] == ' '){
+			wordState.append(" ");
+		}
+		else{
+			wordState.append("_");
+		}
+	}
 }
 
-/***
-    Args:
-        wordList (vector<string>): A list of words
-        index (int): an integer number
-    Returns:
-        answer (string) : the lowercase word is in the position index of wordList
-***/
-string chooseWordFromList(const vector<string>& wordList, int index) 
-{
-    // TODO: Return a lowercase word in the index position of the vector wordList.
-    string answer;
-
-    return answer;
+//Check if word is complete and correct
+bool finishedWord(string word){
+	return (wordState == word);
 }
 
-/***
-    Args:
-        answerWord (string): a word that player needs to guess
-    Returns:
-        secretWord (string): answerWord in hidden form (form of ---)
-***/
-string generateHiddenCharacters(string answerWord){
-    // TODO: Based on answerWord's length, generate hidden characters in form of "---"
-    string secretWord;
+//Creating a temporary copy of the original word
+string createTemp(string origWord){
+	string temp = origWord;
+	
+	for(int i = 0; i < temp.length(); i++){
+		temp[i] = tolower(temp[i]);
+	}
 
-    return secretWord;
+	return temp;
 }
 
-char getInputCharacter() {
-    char ch;
-    cin >> ch;
-    return tolower(ch); 
+//Display current state of 'wordState'
+void displayWordState(){
+	int wordCount = 0;
+	for(int i = 0; i < wordState.length(); i++){
+		if(wordState[i] == ' '){
+			++wordCount;
+			if(wordCount > 4){
+				cout << endl;
+				wordCount = 0;
+			}
+		}
+		cout << wordState[i] << " ";
+	}
+	cout << endl;
 }
 
-/***
-    Args:
-        secretWord (string): secret word in hidden form
-        ch (char): a charater
-        word (string): the answer word
-    Returns:
-        void
-***/
-void updateSecretWord(string& secretWord, const char ch, const string& word)
-{
-    // TODO: Update the secret word if the character ch is in the answer word.
+//Check if letter exists in the original word
+bool letterExists(char letter, string tempWord){
+	return (tempWord.find_first_of(letter) != string::npos);
 }
 
-/***
-    Args:
-        ch (char): a character
-        chars (string): an array of characters
-    Returns:
-        void
-***/
-void updateEnteredChars(const char ch, string& chars){
-    // TODO: append the character ch is in end of the text chars
+//IF THE LETTER EXISTS, add it to 'wordState'
+void changeWordState(char letter, string wordTemp, string word){
+	for(int i = 0; i < wordState.length(); i++){
+		if(wordTemp[i] == letter){
+			wordState[i] = word[i];
+		}
+	}
 }
 
-/***
-    Args:
-        incorrectGuess (int): a number that store the number of player's wrong guess
-    Returns:
-        void
-***/
-void updateIncorrectGuess(int& incorrectGuess){
-    // TODO: increase the value of incorrectGuess by 1
+//Add the letters the user already input
+void addLettersUsed(char letter){
+	char capLetter = toupper(letter);
+	if(lettersUsed.size() == 0){
+		lettersUsed.push_back(capLetter);
+	}
+	else{
+		bool letterExists = false;
+		for(int i = 0; i < lettersUsed.size(); i++){
+			if(lettersUsed[i] == capLetter){
+				letterExists = true;
+				break;
+			}
+		}
+	
+		if(!letterExists){
+			lettersUsed.push_back(capLetter);
+		}
+	}
+
 }
 
-/***
-    Args:
-        ch (char): a character that player enter to console
-        word (string): answer word that play needs to guess
-        secretWord (string): answer word in hidden form
-        correctChars (string): a string that stores correct inputs of player
-        incorrectGuess (int): a number that stores the number of player's wrong guess
-        incorrectChars (string): a string that stores incorrect inputs of player
-    Returns:
-        void
-***/
-void processData(const char ch, const string& word, 
-                string& secretWord, 
-                string& correctChars, 
-                int& incorrectGuess, string& incorrectChars)
-{
-    /*** TODO
-        If ch in word:
-            update secretWord: call updateSecretWord() function
-            update correctChars: call updateEnteredChars() function
-        else:
-            update incorrectGuess: call updateIncorrectGuess() function
-            update incorrectChars: call updateEnteredChars() function
-    ***/
+
+
+//Display the letters the user already input
+void displayLettersUsed(){
+	if(lettersUsed.size() == 0){
+		cout << endl;
+	}
+	else{
+		for(int i = 0; i < lettersUsed.size(); i++){
+			if(i % 5 == 0 && i != 0){
+				cout << "\n" << endl;
+			}
+			cout << "\t" << lettersUsed[i];
+		}
+		cout << "\n" << endl;
+	}
 }
 
+//HARD MODE ONLY:
+//Check if any of the letters previously entered are in the new word
+void checkLettersUsed_HARD(string tempWord, string origWord){
+	char tempLetter;
+	for(int i = 0; i < lettersUsed.size(); i++){
+		tempLetter = tolower(lettersUsed[i]);
+		if(letterExists(tempLetter, tempWord)){
+			changeWordState(tempLetter, tempWord, origWord);
+		}
+	}
+}
+
+void addWordsUsed(string word){
+	wordsUsed.push_back(word);
+}
+
+void displayWordsUsed(){
+	int j;
+	for(int i = 0; i < wordsUsed.size(); i++){
+		j = i + 1;
+		cout << j << ". " << wordsUsed[i] << endl;
+	}
+	cout << endl;
+}
+
+/**********EASY/NORMAL MODE**********/
+void startGame_EASY_NORMAL(string word, int MAX_GUESSES){
+	int curGuessNum = MAX_GUESSES;
+	string inputGuess;
+	char letterGuess;
+	string tempWord = createTemp(word);
+	char tempLetter;
+	int won = 1;	//1 means WIN; 0 means LOSE; 3 means quitting
+	createWordState(word);
+
+	while(true){
+		if(curGuessNum == 0){
+			displayCurFigure(MAX_GUESSES, curGuessNum);
+			won = 0;
+			break;
+		}
+		else if(finishedWord(word)){
+			break;
+		}
+
+		displayCurFigure(MAX_GUESSES, curGuessNum);
+		displayWordState();
+		cout << "\nNumber of guesses left: " << curGuessNum << endl;
+		cout << "Letters that you have guessed:\n";
+		displayLettersUsed();
+		cout << "Enter a letter (0 to exit): ";
+		cin >> inputGuess;
+		letterGuess = inputGuess[0];
+		system("cls");
+		
+		//USER QUITS:
+		if(letterGuess == '0'){
+			won = 3;
+			break;
+		}
+		////////////
+
+		tempLetter = tolower(letterGuess);
+		addLettersUsed(tempLetter);
+
+		if(!letterExists(tempLetter, tempWord)){
+			--curGuessNum;
+		}
+		else{
+			changeWordState(tempLetter, tempWord, word);
+		}
+	}
+	
+	lettersUsed.clear();
+	wordState = "";
+
+	if(won == 1){
+		cout << "YOU WON! CONGRATULATIONS!" << endl;
+		cout << "Your word: " << word << endl;
+	}
+	else if(won == 0){
+		cout << "You lose!!!" << endl;
+		cout << "The word was \"" << word << "\"" << endl;
+	}
+	else{
+		cout << "Exiting!!" << endl;
+	}
+	
+}
+/********************************************/
+
+/**********HARD MODE**********/
+void startGame_HARD(vector<string> list, int MAX_GUESSES){
+	string word = list[rand() % list.size()];
+	int curGuessNum = MAX_GUESSES;
+	string inputGuess;
+	char letterGuess;
+	string tempWord;
+	char tempLetter;
+	int won = 1;	//1 means WIN; 0 means LOSE; 3 means quitting
+	createWordState(word);
+
+	while(true){
+		if(curGuessNum == 0){
+			displayCurFigure(MAX_GUESSES, curGuessNum);
+			won = 0;
+			break;
+		}
+		else if(finishedWord(word)){
+			break;
+		}
+
+		displayCurFigure(MAX_GUESSES, curGuessNum);
+		displayWordState();
+		cout << "\nNumber of guesses left: " << curGuessNum << endl;
+		cout << "Letters that you have guessed:\n";
+		displayLettersUsed();
+		cout << "Enter a letter (0 to exit): ";
+		cin >> inputGuess;
+		letterGuess = inputGuess[0];
+		system("cls");
+
+		//USER QUITS:
+		if(letterGuess == '0'){
+			won = 3;
+			break;
+		}
+		////////////
+
+		tempLetter = tolower(letterGuess);
+		addLettersUsed(tempLetter);
+		tempWord = createTemp(word);
+
+		if(!letterExists(tempLetter, tempWord)){
+			--curGuessNum;
+			wordState = "";
+			word = list[rand() % list.size()];
+			addWordsUsed(word);
+			createWordState(word);
+			tempWord = createTemp(word);
+			checkLettersUsed_HARD(tempWord, word);
+		}
+		else{
+			changeWordState(tempLetter, tempWord, word);
+		}
+	}
+	
+	lettersUsed.clear();
+	wordState = "";
+
+	if(won == 1){
+		cout << "YOU WON! CONGRATULATIONS!" << endl;
+		cout << "Winning word: " << word << "\n" << endl;
+		cout << "Words used: " << endl;
+		displayWordsUsed();
+		wordsUsed.clear();
+	}
+	else if(won == 0){
+		cout << "You lose!!!" << endl;
+		cout << "Words used: " << endl;
+		displayWordsUsed();
+		wordsUsed.clear();
+	}
+	else{
+		cout << "Exiting!!" << endl;
+	}
+
+}
+/********************************************/
+
+/*********MAIN*********/
+int main(){
+	string word;
+	string fileName;
+	vector<string> wordsList;
+	srand(time(0));
+	string playGame;
+	string difficulty;
+	ifstream fin;
+
+	while(true){
+		cout << "Welcome to JSP's Hangman Game!" << endl;
+		cout << "MAIN MENU" << endl;
+		cout << "1) Start Game" << endl;
+		cout << "2) Load File" << endl;
+		cout << "3) Exit" << endl;
+		cout << ">> ";
+		fileName = "";
+		cin >> playGame;
+		
+
+		if(playGame == "1" || playGame == "2"){
+			if(playGame == "1"){	//IF user selected Start Game
+				system("cls");
+				wordsList.assign(defaultWords, defaultWords + 12);
+				word = wordsList[rand() % 12];
+			}
+			else if(playGame == "2"){
+				cin.ignore();
+				system("cls");
+				cout << "**IMPORTANT**\nFile(s) must contain words that are separated by a new line. If a word contains characters that are NOT letters, those characters will be deleted.\n" << endl;
+				cout << "Please enter a file name to import your own words list: ";
+				getline(cin, fileName);
+
+
+				fin.open(fileName);
+				if(fin.fail()){
+					system("cls");
+					cout << "\"" + fileName + "\" doesn't exist!\n" << endl;
+					fin.close();
+					continue;
+				}
+				else{
+					setWordsList(wordsList, fileName);
+					fin.close();
+					if(SIZE == 0){
+						system("cls");
+						cout << "File is empty!\n" << endl;
+						continue;
+					}
+					else{
+						system("cls");
+						word = wordsList[rand() % SIZE];
+						cout << "Successfully read the file contents!\n" << endl;
+					}
+				}
+			}
+			
+			
+			while(true){
+				cout << "CHOOSE A DIFFICULTY: " << endl;
+				cout << "1) EASY" <<endl;
+				cout << "2) NORMAL" << endl;
+				cout << "3) HARD" << endl;
+				cout << "4) Difficulty description" << endl;
+				cout << "0 to return to main menu" << endl;
+				cout << ">> ";
+				cin >> difficulty;
+
+				if(difficulty == "0"){
+					system("cls");
+					break;
+				}
+				else if(difficulty == "1"){	//EASY
+					system("cls");
+					cout << "Starting Easy Mode!" << endl;
+					startGame_EASY_NORMAL(word, 12);
+					wordState.clear();
+					wordsList.clear();
+					cout << endl;
+					break;
+				}
+				else if(difficulty == "2"){	//NORMAL
+					system("cls");
+					cout << "Starting Normal Mode!" << endl;
+					startGame_EASY_NORMAL(word, 6);
+					wordState.clear();
+					wordsList.clear();
+					cout << endl;
+					break;
+				}
+				else if(difficulty == "3"){	//HARD
+					system("cls");
+					cout << "Starting Hard Mode!" << endl;
+					startGame_HARD(wordsList, 6);
+					wordState.clear();
+					wordsList.clear();
+					cout << endl;
+					break;
+				}
+				else if(difficulty == "4"){
+					system("cls");
+					cout << "EASY\t - 12 chances to guess the correct letters" << endl;
+					cout << "NORMAL\t - 6 chances to guess the correct letters" << endl;
+					cout << "HARD\t - 6 chance to guess the correct letters and \n\t every wrong guess will change the word!\n" << endl;
+				}
+				else{
+					system("cls");
+					cout << "Invalid option!\n" << endl;
+				}
+			}
+		}
+		else if(playGame == "3"){
+			cout << "Thanks for playing!" << endl;
+			break;
+		}
+		else{
+			system("cls");
+			cout << "Invalid option!\n" << endl;
+			cin.ignore();
+		}
+	}
+
+	return 0;
+}
